@@ -1,0 +1,7 @@
+{
+  "name": "Widget Schedule Chauffage",
+  "description": "Carte Lovelace pour modifier visuellement les plannings schedule_state par zone de chauffage",
+  "render_readme": true,
+  "filename": "widget-schedule-chauffage.js",
+  "content_in_root": true
+}
