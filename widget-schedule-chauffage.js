@@ -1,5 +1,5 @@
 /**
- * Widget Planning Chauffage v2.0
+ * Widget Planning Chauffage v2.1
  * Vue globale + édition inline par zone
  */
 
@@ -505,16 +505,25 @@ class WidgetPlanningChauffage extends HTMLElement {
     this._saveStatus[zoneKey] = 'saving';
     this._refreshEditStatus(zoneKey);
     try {
-      const json = JSON.stringify(data);
+      // A unique revision lets native HA template sensors ignore partial writes.
+      // Keep it in both the JSON and metadata; metadata is the commit marker.
+      this._saveCounter = (this._saveCounter || 0) + 1;
+      const revision = `${Date.now()}-${this._saveCounter}`;
+      const { _save_rev: _ignoredRevision, ...scheduleData } = data;
+      const json = JSON.stringify({ _save_rev: revision, ...scheduleData });
       const chunks = [];
       for (let i = 0; i < json.length; i += CHUNK_SIZE) chunks.push(json.substring(i, i + CHUNK_SIZE));
-      for (let i = 0; i < chunks.length; i++) {
+
+      // Write all pieces before publishing the new revision in _meta.
+      // In particular, _0 is written last because legacy schedule_updater watches it.
+      for (let i = chunks.length - 1; i >= 0; i--) {
         await this._hass.callService('input_text', 'set_value', {
           entity_id: `${zone.entity_base}_${i}`, value: chunks[i]
         });
       }
       await this._hass.callService('input_text', 'set_value', {
-        entity_id: `${zone.entity_base}_meta`, value: `chunks:${chunks.length}`
+        entity_id: `${zone.entity_base}_meta`,
+        value: `chunks:${chunks.length}:${revision}`
       });
       this._saveStatus[zoneKey] = 'ok';
     } catch(e) {
